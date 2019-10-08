@@ -9,7 +9,7 @@ import (
 
 func redeemCode(code string) error {
 	args := []string{
-		"-c", "New Crunchyroll Guest Pass ["+code+"]",
+		"-c", "New Crunchyroll Guest Pass [" + code + "]",
 		"--action", "termux-open " + GPRURL + code,
 	}
 
