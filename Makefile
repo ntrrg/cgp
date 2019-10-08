@@ -1,5 +1,4 @@
 gofiles := $(filter-out ./vendor/%, $(shell find . -iname "*.go" -type f))
-gosrcfiles := $(filter-out %_test.go, $(gofiles))
 
 .PHONY: all
 all: build
@@ -10,6 +9,9 @@ build: dist/$(shell basename "$$PWD")-$(shell go env "GOOS")-$(shell go env "GOA
 .PHONY: build-all
 build-all:
 	$(MAKE) -s build-android-arm
+	$(MAKE) -s build-android-arm64
+	$(MAKE) -s build-linux-386
+	$(MAKE) -s build-linux-amd64
 
 build-%:
 	@\
@@ -28,6 +30,41 @@ dist/%: $(shell go list -f "{{range .GoFiles}}{{.}} {{end}}")
 
 coverage_file := coverage.txt
 
+.PHONY: ca
+ca:
+	golangci-lint run
+
 .PHONY: ci
-ci: clean all
+ci: clean-dev test-race lint ca coverage build-all
+
+.PHONY: clean-dev
+clean-dev: clean
+	rm -rf $(coverage_file)
+
+.PHONY: coverage
+coverage: $(coverage_file)
+	go tool cover -func $<
+
+.PHONY: coverage-web
+coverage-web: $(coverage_file)
+	go tool cover -html $<
+
+.PHONY: format
+format:
+	gofmt -s -w -l $(gofiles)
+
+.PHONY: lint
+lint:
+	gofmt -d -e -s $(gofiles)
+
+.PHONY: test
+test:
+	go test -v ./...
+
+.PHONY: test-race
+test-race:
+	go test -race -v ./...
+
+$(coverage_file): $(shell go list -f "{{range .GoFiles}}{{.}} {{end}}") $(shell go list -f "{{range .TestGoFiles}}{{.}} {{end}}")
+	go test -coverprofile $(coverage_file) ./...
 
