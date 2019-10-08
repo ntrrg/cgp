@@ -8,10 +8,12 @@ build: dist/$(shell basename "$$PWD")-$(shell go env "GOOS")-$(shell go env "GOA
 
 .PHONY: build-all
 build-all:
-	$(MAKE) -s build-android-arm
-	$(MAKE) -s build-android-arm64
+	# $(MAKE) -s build-android-arm
+	# $(MAKE) -s build-android-arm64
 	$(MAKE) -s build-linux-386
 	$(MAKE) -s build-linux-amd64
+	$(MAKE) -s build-linux-arm
+	$(MAKE) -s build-linux-arm64
 
 build-%:
 	@\
