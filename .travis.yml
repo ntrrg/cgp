@@ -1,0 +1,27 @@
+os: linux
+dist: xenial
+git:
+  depth: 1
+language: go
+go:
+  - "1.12"
+  - "1.13"
+env:
+  - GO111MODULE=on
+before_install:
+  - go get github.com/golangci/golangci-lint/cmd/golangci-lint@v1.19.1
+jobs:
+  include:
+    - script: make test-race
+    - stage: "QA"
+      name: "Linting"
+      script: make lint
+    - name: "Code Analysis"
+      script: make ca
+    - name: "Tests coverage"
+      script: make coverage
+    - stage: "Build"
+      script: make build-all
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+
