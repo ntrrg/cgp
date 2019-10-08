@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -15,10 +16,16 @@ import (
 
 const (
 	// Guest passes URL
-	GPURL = "https://www.crunchyroll.com/forumtopic-803801/the-official-guest-pass-thread-read-opening-post-first?pg=last"
+	GPURL = "https://www.crunchyroll.com/forumtopic-803801/the-official-guest-pass-thread-read-opening-post-first?pg=last" // nolint: lll
 
 	// Guest passes redeem URL
 	GPRURL = "https://www.crunchyroll.com/coupon_redeem?code="
+
+	// Waiting time between requests
+	WaitTime = time.Second * 15
+
+	// Preallocated size for the database
+	DBPreallocatedSize = 100
 )
 
 var (
@@ -36,46 +43,56 @@ func main() {
 	}
 
 	codes := make(chan string)
-	go ListenForCodes(codes)
-
-	for {
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Printf("can't do the request -> %+v", err)
-			continue
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("bad response from Crunchyroll -> %d", resp.StatusCode)
-			continue
-		}
-
-		go GetCodes(resp.Body, codes)
-		time.Sleep(time.Second * 30)
-	}
+	go GetComments(req, codes)
+	ListenForCodes(codes)
 }
 
-func GetCodes(rc io.ReadCloser, codes chan<- string) {
-	defer rc.Close()
-
-	data, err := ioutil.ReadAll(rc)
+// GetCodes reads r and sends every code it finds to codes.
+func GetCodes(r io.Reader, codes chan<- string) error {
+	data, err := ioutil.ReadAll(r)
 	if err != nil {
-		log.Printf("can't read response from Crunchyroll -> %+v", err)
-		return
+		return fmt.Errorf("can't read response from Crunchyroll -> %w", err)
 	}
 
 	for _, comment := range bytes.Split(data, commentsPrefix)[1:] {
 		comment = bytes.SplitN(comment, commentsSuffix, 2)[0]
-		comment = bytes.Trim(comment, " ")
 
 		for _, code := range codesRE.FindAll(comment, -1) {
 			codes <- string(code)
 		}
 	}
+
+	return nil
 }
 
+// GetComments gets comments from Crunchyroll and looks for codes in them.
+func GetComments(req *http.Request, codes chan<- string) {
+	for {
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Printf("can't do the request -> %+v", err)
+			goto wait
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("bad response from Crunchyroll -> %d", resp.StatusCode)
+			goto closeRespBody
+		}
+
+		if err := GetCodes(resp.Body, codes); err != nil {
+			log.Printf("%+v", err)
+		}
+
+	closeRespBody:
+		resp.Body.Close()
+	wait:
+		time.Sleep(WaitTime)
+	}
+}
+
+// ListenForCodes listens for new codes and sends them to RedeemCode.
 func ListenForCodes(codes <-chan string) {
-	db := make(map[string]struct{}, 1000)
+	db := make(map[string]struct{}, DBPreallocatedSize)
 
 	for code := range codes {
 		if _, ok := db[code]; ok {
@@ -83,7 +100,7 @@ func ListenForCodes(codes <-chan string) {
 		}
 
 		if err := RedeemCode(code); err != nil {
-			log.Printf("can't open the web browser -> %+v", err)
+			log.Printf("can't create notification -> %+v", err)
 			continue
 		}
 
@@ -91,6 +108,9 @@ func ListenForCodes(codes <-chan string) {
 	}
 }
 
+// RedeemCode notifies when new codes are ready for redeem. If the current
+// platform doesn't support notifications, it just opens the web browser for
+// redeeming the code.
 func RedeemCode(code string) error {
 	return redeemCode(code)
 }
