@@ -17,7 +17,8 @@ func redeemCode(code string) error {
 		"--object-path", "/org/freedesktop/Notifications",
 		"--method", "org.freedesktop.Notifications.Notify",
 		"CGP", "0", "web-browser",
-		"New Crunchyroll Guest Pass\n\nOpen " + GPRURL, "<b>" + code + "</b>",
+		"New Crunchyroll Guest Pass",
+		"<a href='" + GPRURL + code + "'>" + code + "</a>",
 		"['default', 'Redeem']", "{}", "int32 5000",
 	}
 
