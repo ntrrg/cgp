@@ -8,9 +8,6 @@ import (
 	"os/exec"
 )
 
-// gdbus monitor --session --dest org.freedesktop.Notifications
-// --object-path /org/freedesktop/Notifications
-
 func redeemCode(code string) error {
 	args := []string{
 		"call", "--session", "--dest", "org.freedesktop.Notifications",
